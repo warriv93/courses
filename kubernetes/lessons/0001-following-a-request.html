@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 · Following one request · Kubernetes for Node developers</title>
+<link rel="stylesheet" href="../../assets/course.css">
+<script src="../../assets/quiz.js" defer></script>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="../index.html">Kubernetes for Node developers</a>
+  <a href="../index.html">Overview</a>
+  <a href="../reference/kubernetes-summary.html">Summary</a>
+  <a class="current" href="0001-following-a-request.html">Lesson 1</a>
+</div></nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">Lesson 1 · 10 minutes</p>
+  <h1>Following one request.</h1>
+  <p class="lede">By the end, you can trace <code>staging.example.com/admin</code> from the browser to the Next.js container, and say why the routing change can safely ship before the app does.</p>
+</header>
+
+<section class="prose">
+  <div class="callout">
+    <span class="label">Before you start</span>
+    Watch <a href="https://www.youtube.com/watch?v=PziYflu8cB8">Kubernetes in 100 Seconds</a> (2 min). Keep the <a href="../reference/kubernetes-summary.html#components">component table</a> open in another tab.
+  </div>
+</section>
+
+<section class="prose">
+  <h2>Five hops in, one call onward.</h2>
+  <p class="sub">A typical setup at a made-up company, Acme: one GKE cluster, namespace <code>default</code>.</p>
+  <ol class="flow">
+    <li><span class="tag">Google Cloud</span><span class="hop">GKE Ingress → Google HTTPS load balancer</span>
+      <span class="what"><code>web-ingress</code> sends every path (<code>/*</code>) to one Service: <code>edge-nginx</code>. It handles TLS and the public IP, and nothing else.</span></li>
+    <li><span class="tag">Service · NodePort</span><span class="hop">edge-nginx</span>
+      <span class="what">Load-balances across the nginx pods.</span></li>
+    <li><span class="tag">Pod · nginx</span><span class="hop">nginx, <code>server_name staging.example.com</code></span>
+      <span class="what">A <code>location /admin { proxy_pass http://$adminapp; }</code> block. This is where path routing happens.</span></li>
+    <li><span class="tag">Service · ClusterIP</span><span class="hop">admin-app</span>
+      <span class="what">Reached by DNS name <code>admin-app.default.svc.cluster.local:80</code>. It forwards to port 8089 on any pod labelled <code>name: admin-app</code>. Internal only.</span></li>
+    <li><span class="tag">Pod · distroless Node 24</span><span class="hop">The Next.js app</span>
+      <span class="what">Started and kept alive by a Deployment (<code>replicas: 1</code>). It's only sent traffic once <code>/admin/ping</code> passes readiness.</span></li>
+    <li class="internal"><span class="tag">ClusterIP · never public</span><span class="hop">→ orders-api-internal</span>
+      <span class="what">The app calls an internal API pod-to-pod. No nginx route points at it, so it has no public surface at all.</span></li>
+  </ol>
+  <div class="callout warn">
+    <span class="label">The surprise</span>
+    Kubernetes has its own Ingress object, so why put nginx behind it? Some teams do this because nginx gives them routing features (rewrites, redirects, per-path headers) that a cloud Ingress lacks, all in one familiar file. The trade-off: GKE Ingress becomes a dumb front door, and one nginx config holds the routing table for <em>every</em> site. A typo there takes them all down.
+  </div>
+</section>
+
+<section class="prose">
+  <h2>Why the odd <code>set $var</code> lines.</h2>
+  <pre><code><mark>set $adminapp</mark> admin-app.default.svc.cluster.local:80;
+…
+location /admin {
+    proxy_pass http://<mark>$adminapp</mark>;
+}</code></pre>
+    <p>If <code>proxy_pass</code> names the host directly, nginx looks it up when it boots, and <strong>refuses to start</strong> if that Service doesn't exist yet (<a href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass">nginx docs</a>: with a variable, the name is resolved at request time). With a variable, the lookup happens per request. So the route can ship before the Service exists. Until the app deploys, that one path returns an error, and every other route keeps working.</p>
+  <p>So the routing change can go first: it's safe on its own, and the URL works the moment the app's Service appears.</p>
+</section>
+
+<section class="prose">
+  <h2>What the app ships with.</h2>
+  <p class="sub">Three files, usually copied from an app that already runs this way.</p>
+  <div class="card table-card">
+  <table>
+    <tr><th>File</th><th>What it is</th><th>Why</th></tr>
+    <tr><td><code>Dockerfile</code></td><td>Multi-stage: build with <code>node:24-alpine</code> + turbo, run on <code>distroless/nodejs24:nonroot</code></td><td>The final image has no shell and doesn't run as root, so it's small and has little to attack</td></tr>
+    <tr><td><code>deployment-template.yaml</code></td><td>Deployment: 1 replica, probes, CPU/memory limits, ConfigMap as env</td><td><code>maxUnavailable: 0</code> + <code>maxSurge: 1</code> gives a zero-downtime rollout</td></tr>
+    <tr><td><code>service.yaml</code>, <code>service-devtest.yaml</code></td><td>Two ClusterIP Services: main and dev tracks</td><td>Gives nginx a stable DNS name for each track</td></tr>
+  </table>
+  </div>
+  <p>The <code>{{PLACEHOLDERS}}</code> in the YAML are filled in by CI, not by Helm. Plain YAML with placeholders filled by a small script is common, and <a href="https://cloud.google.com/deploy/docs/overview">Google Cloud Deploy</a> applies it to the staging cluster. Promoting to prod is a manual click.</p>
+</section>
+
+<section class="prose">
+  <h2>Check yourself.</h2>
+  <p class="sub">From memory first. A wrong guess now makes the right answer stick.</p>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">1 · Which hop decides that <code>/admin</code> goes to the Next.js app?</p>
+    <ol class="options">
+      <li><button>the GKE Ingress rules</button></li>
+      <li><button>the ClusterIP Service selector</button></li>
+      <li><button>nginx's location block config</button></li>
+      <li><button>the Deployment's readiness probe</button></li>
+    </ol>
+    <div class="feedback">GKE Ingress sends <code>/*</code> to nginx and doesn't care about paths. The <code>location</code> block in nginx's config is the real routing table.</div>
+  </div>
+
+  <div class="quiz" data-answer="0">
+    <p class="q">2 · The nginx route is deployed, but the app isn't yet. What happens?</p>
+    <ol class="options">
+      <li><button>only that path errors</button></li>
+      <li><button>nginx fails to start</button></li>
+      <li><button>all sites go down at once</button></li>
+      <li><button>requests reach another app instead</button></li>
+    </ol>
+    <div class="feedback">The <code>set $var</code> trick moves DNS lookup to request time, so nginx boots fine. Only requests to <code>/admin</code> fail until the Service exists. Without the variable, nginx wouldn't start and every site would be down. That's the danger the trick prevents.</div>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q">3 · The Next.js pod crashes at 3 am. What restarts it?</p>
+    <ol class="options">
+      <li><button>pm2 inside the container</button></li>
+      <li><button>a GitHub Actions rerun job</button></li>
+      <li><button>Cloud Deploy's next release run</button></li>
+      <li><button>kubelet, reconciling desired state</button></li>
+    </ol>
+    <div class="feedback">The Deployment says one replica should exist. The kubelet restarts a crashed container, and the controller replaces a missing pod. No pm2 is needed. Kubernetes does pm2's job one level up.</div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q">4 · Why is the internal API a ClusterIP Service?</p>
+    <ol class="options">
+      <li><button>NodePort costs extra on GKE</button></li>
+      <li><button>so it's unreachable from internet</button></li>
+      <li><button>nginx can't proxy NodePort Services</button></li>
+      <li><button>ClusterIP gives faster pod startup</button></li>
+    </ol>
+    <div class="feedback">ClusterIP is reachable only from inside the cluster. The Next.js app calls it pod-to-pod, and no nginx route points at it, so the internal API has no public surface at all.</div>
+  </div>
+
+  <p class="quiz-score"></p>
+</section>
+
+<section class="prose">
+  <div class="grid grid-2">
+    <a class="card" href="https://www.youtube.com/watch?v=80Ew_fsV4rM">
+      <div class="num">Watch next · 23 min</div>
+      <h3>Kubernetes Ingress, simply explained</h3>
+      <p>TechWorld with Nana. Ingress rules vs ingress controller: the split Acme replaced with its own nginx.</p>
+    </a>
+    <a class="card" href="../reference/kubernetes-summary.html">
+      <div class="num">Keep handy</div>
+      <h3>Kubernetes, summarised</h3>
+      <p>Components, strengths, weak spots and alternatives, and the video path.</p>
+    </a>
+  </div>
+  <div class="callout good">
+    <span class="label">Questions?</span>
+    Ask Claude in your terminal. Paste any Kubernetes YAML you come across and ask "what does this create, and what would break without it?"
+  </div>
+</section>
+</main>
+
+<footer>Kubernetes for Node developers · Lesson 1 · next: what CI does between <code>git push</code> and a running pod</footer>
+</body>
+</html>

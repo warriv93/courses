@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 · Reading nullable Kotlin</title>
+<link rel="stylesheet" href="../../assets/course.css">
+<script src="../../assets/quiz.js" defer></script>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="../index.html">Kotlin for TypeScript developers</a>
+  <a href="../index.html">Overview</a>
+  <a href="../reference/kotlin-cheatsheet.html">Cheat sheet</a>
+  <a class="current" href="0001-reading-nullable-kotlin.html">Lesson 1</a>
+</div></nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">Lesson 1 · 5 minutes</p>
+  <h1>Reading nullable Kotlin.</h1>
+  <p class="lede">By the end, you can look at any line that uses <code>?.</code>, <code>?:</code> or <code>!!</code> in a PR and say exactly what happens when the value is null.</p>
+</header>
+
+<section class="prose">
+  <details>
+    <summary>Warm-up: from memory, what does <code>x?.let { f(it) }</code> return when <code>x</code> is null?</summary>
+    <p><code>null</code>. The <code>?.</code> stops the chain before <code>let</code> runs, so <code>f</code> is never called. When <code>x</code> isn't null, you get whatever <code>f(x)</code> returns.</p>
+  </details>
+</section>
+
+<section class="prose">
+  <h2>You already know three of four.</h2>
+  <p class="sub">Kotlin's null operators map almost one to one onto TypeScript.</p>
+  <div class="card table-card">
+  <table>
+    <tr><th>TypeScript</th><th>Kotlin</th><th>When the value is null</th></tr>
+    <tr><td><code>string | null</code></td><td><code>String?</code></td><td>Only the <code>?</code> type may hold null (<a href="https://kotlinlang.org/docs/null-safety.html#nullable-types-and-non-nullable-types">docs</a>)</td></tr>
+    <tr><td><code>a?.b</code></td><td><code>a?.b</code></td><td>Gives <code>null</code> (<a href="https://kotlinlang.org/docs/null-safety.html#safe-call-operator">docs</a>)</td></tr>
+    <tr><td><code>a ?? b</code></td><td><code>a ?: b</code></td><td>Gives <code>b</code>. <code>b</code> is only evaluated when <code>a</code> is null (<a href="https://kotlinlang.org/docs/null-safety.html#elvis-operator">docs</a>)</td></tr>
+    <tr><td><code>a!</code></td><td><code>a!!</code></td><td><strong>Throws NullPointerException</strong> (<a href="https://kotlinlang.org/docs/null-safety.html#not-null-assertion-operator">docs</a>)</td></tr>
+  </table>
+  </div>
+  <div class="callout warn">
+    <span class="label">The one that bites</span>
+    TypeScript erases <code>!</code> at compile time, so it "doesn't change the runtime behavior of your code" (<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#non-null-assertion-operator-postfix-">TS handbook</a>). Kotlin's <code>!!</code> is a real check that crashes. Same intent, very different failure.
+  </div>
+</section>
+
+<section class="prose">
+  <h2>The Kotlin-only move.</h2>
+  <p class="sub"><code>throw</code> and <code>return</code> are expressions, so they can sit after <code>?:</code>.</p>
+  <pre><code>private fun titleOf(request: BookRequestDTO): String {
+    val title = Titles.normalize(request.title) <mark>?: throw</mark> IllegalArgumentException("title must not be blank")
+    require(title.length <= MAX_TITLE_LENGTH) { "title must be at most $MAX_TITLE_LENGTH characters" }
+    return title
+}</code></pre>
+  <p><code>normalize</code> returns <code>String?</code>. It gives null when the trimmed title is empty. After the <code>?: throw</code>, the compiler knows <code>title</code> can't be null, so its type is plain <code>String</code>. In TS you'd write the same thing in two statements: assign, then <code>if (title == null) throw …</code>.</p>
+</section>
+
+<section class="prose">
+  <h2>Check yourself.</h2>
+  <p class="sub">Answer before you look anything up. Getting it wrong now makes it stick better later.</p>
+
+  <div class="quiz" data-answer="2">
+    <p class="q">1 · In <code>titleOf</code> above, <code>request.title</code> is <code>"   "</code>. What happens on the <code>val title = …</code> line?</p>
+    <ol class="options">
+      <li><button>title holds a null</button></li>
+      <li><button>title holds empty string</button></li>
+      <li><button>throws an IllegalArgumentException here</button></li>
+      <li><button>throws a NullPointerException here</button></li>
+    </ol>
+    <div class="feedback">The trimmed title is empty, so <code>normalize</code> returns <code>null</code>. The right side of <code>?:</code> runs, and that's the <code>throw</code>. Nothing is dereferenced, so there's no NPE.</div>
+  </div>
+
+  <div class="quiz" data-answer="0">
+    <p class="q">2 · After that line, what is the type of <code>title</code>?</p>
+    <ol class="options">
+      <li><button><code>String</code></button></li>
+      <li><button><code>String?</code></button></li>
+      <li><button><code>Nothing</code></button></li>
+      <li><button><code>Any?</code></button></li>
+    </ol>
+    <div class="feedback">The only way past the line with a value is the non-null branch, so Kotlin types it <code>String</code>. That's why the next line can call <code>title.length</code> without <code>?.</code>. (<code>Nothing</code> is the type of the <code>throw</code> itself, which is how this works under the hood.)</div>
+  </div>
+
+  <div class="quiz" data-answer="1">
+    <p class="q">3 · Every event class in a shared library has this. What happens if <code>data</code> is null at runtime?</p>
+    <pre><code>override fun getData(): OrderPlacedEventData {
+    return data!!
+}</code></pre>
+    <ol class="options">
+      <li><button>returns null to caller</button></li>
+      <li><button>throws NullPointerException right there</button></li>
+      <li><button>compiler rejects this code</button></li>
+      <li><button>returns an empty object</button></li>
+    </ol>
+    <div class="feedback">This is the TS-intuition trap. If you read <code>!!</code> like TS's <code>!</code>, you'd expect null to slip through. Kotlin checks it and throws on the spot. Here <code>data</code> is nullable only so the JSON deserialiser can build an empty event; the <code>!!</code> says "by the time anyone calls this, it's set".</div>
+  </div>
+
+  <div class="quiz" data-answer="3">
+    <p class="q">4 · <code>findCustomer</code> returns null. What does this line do?</p>
+    <pre><code>val customer = customerRepository.findCustomer(order.customerId) ?: return null</code></pre>
+    <ol class="options">
+      <li><button>customer becomes null, continues</button></li>
+      <li><button>throws NullPointerException on use</button></li>
+      <li><button>compiler rejects this line</button></li>
+      <li><button>function returns null immediately</button></li>
+    </ol>
+    <div class="feedback"><code>?: return null</code> is a guard clause. The enclosing function <code>shippingLabelFor</code> exits with <code>null</code>, and on every later line <code>customer</code> is non-null.</div>
+  </div>
+
+  <p class="quiz-score"></p>
+</section>
+
+<section class="prose">
+  <h2>Take it to a PR.</h2>
+  <p>Next time you see <code>!!</code> in a diff, ask one question: <em>what guarantees this isn't null?</em> If the answer is "nothing, the helper just returns a nullable", the fix is usually upstream. Here's an example of the pattern:</p>
+  <pre><code>internal fun storefrontUrlOf(properties: StoreProperties, server: ServerDetails): String =
+    properties.publicUrl.orIfBlank("https://${server.host}")<mark>!!</mark>
+
+private fun String?.orIfBlank(other: String?) = this?.takeIf { it.isNotBlank() } ?: other</code></pre>
+  <p>The fallback is never null, but <code>orIfBlank</code> is typed to accept a <code>String?</code>, so the result is <code>String?</code> and the caller has to <code>!!</code> it. Typing <code>other</code> as <code>String</code> makes the result <code>String</code> and removes the <code>!!</code>. That's a good, specific review comment.</p>
+</section>
+
+<section class="prose">
+  <div class="grid grid-2">
+    <a class="card" href="https://kotlinlang.org/docs/null-safety.html">
+      <div class="num">Read next · 10 min</div>
+      <h3>Null safety, kotlinlang.org</h3>
+      <p>The official page. One short section per operator, with runnable examples.</p>
+    </a>
+    <a class="card" href="../reference/kotlin-cheatsheet.html#null-safety">
+      <div class="num">Keep handy</div>
+      <h3>Cheat sheet</h3>
+      <p>The TS-to-Kotlin table and everything else we've covered, on one page.</p>
+    </a>
+  </div>
+  <div class="callout good">
+    <span class="label">Questions?</span>
+    Ask Claude in your terminal. Paste any line from a PR you're reviewing and ask "what happens if this is null?"
+  </div>
+</section>
+</main>
+
+<footer>Kotlin for TypeScript developers · Lesson 1 · next: <code>it</code>, lambdas and <code>?.let</code></footer>
+</body>
+</html>

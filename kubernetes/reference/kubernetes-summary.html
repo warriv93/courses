@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes, summarised · Kubernetes for Node developers</title>
+<link rel="stylesheet" href="../../assets/course.css">
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="../index.html">Kubernetes for Node developers</a>
+  <a href="../index.html">Overview</a>
+  <a class="current" href="kubernetes-summary.html">Summary</a>
+  <a href="../lessons/0001-following-a-request.html">Lesson 1</a>
+</div></nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">Reference</p>
+  <h1>Kubernetes, summarised.</h1>
+  <p class="lede">You write down what should be running. Kubernetes keeps making it true, on as many machines as you give it.</p>
+</header>
+
+<section class="prose" id="one-idea">
+  <h2>The one idea.</h2>
+  <p class="sub">Everything else is a consequence of desired state.</p>
+  <p>You don't tell Kubernetes "start a container". You hand it a YAML file that says "there should be 2 copies of <code>orders-api:gh-812</code>, each with 512 MiB of memory, answering <code>/ping</code>". Controllers then loop forever, comparing what's running against what you asked for and fixing the difference (<a href="https://kubernetes.io/docs/concepts/architecture/controller/">docs: controllers</a>). A crashed container, a dead machine or a new image tag are all the same event to it: actual state differs from desired, so fix it.</p>
+  <div class="callout">
+    <span class="label">From the Node world</span>
+    pm2 does this for processes on one machine. Kubernetes does it for containers across a cluster of machines. nginx isn't a competitor: it's something you <em>run on</em> Kubernetes to route traffic, which is exactly what Acme does.
+  </div>
+  <div class="diagram">
+    <div class="chips" style="justify-content:center">
+      <span class="chip cfg">You: YAML says "1 × admin-app"</span>
+      <span class="chip">→ controller compares</span>
+      <span class="chip pod">0 running → start 1</span>
+      <span class="chip">↺ forever</span>
+    </div>
+  </div>
+</section>
+
+<section id="picture">
+  <div class="prose">
+    <h2>The picture.</h2>
+    <p class="sub">A typical setup at a made-up company, Acme: one staging cluster on GKE, reduced to what one request touches.</p>
+  </div>
+  <div class="diagram" style="max-width:860px;margin-left:auto;margin-right:auto">
+    <div class="box ext"><div class="box-title">Internet</div>
+      <div class="chips"><span class="chip ext">browser → https://staging.example.com/admin</span></div></div>
+    <div class="arrow-down"></div>
+    <div class="box edge"><div class="box-title">Ingress <small>· GKE turns it into a Google HTTPS load balancer</small></div>
+      <div class="chips"><span class="chip">web-ingress: <code>/*</code> → edge-nginx</span></div></div>
+    <div class="arrow-down"></div>
+    <div class="box cluster"><div class="box-title">Cluster staging-gke <small>· namespace default</small></div>
+      <div class="box plane"><div class="box-title">Control plane <small>· run by Google</small></div>
+        <div class="chips"><span class="chip">API server</span><span class="chip">etcd</span><span class="chip">scheduler</span><span class="chip">controllers</span></div></div>
+      <div class="nodes">
+        <div class="box node"><div class="box-title">Node A <small>· kubelet, kube-proxy</small></div>
+          <div class="chips"><span class="chip pod">nginx pod</span><span class="chip pod">admin-app pod</span><span class="chip pod">web pod</span></div></div>
+        <div class="box node"><div class="box-title">Node B <small>· kubelet, kube-proxy</small></div>
+          <div class="chips"><span class="chip pod">nginx pod</span><span class="chip pod">orders-api pod</span><span class="chip pod">billing pod</span></div></div>
+      </div>
+      <div class="box"><div class="box-title">Services <small>· stable names in front of pods, wherever they run</small></div>
+        <div class="chips"><span class="chip svc">edge-nginx</span><span class="chip svc">admin-app</span><span class="chip svc">orders-api-internal</span><span class="chip svc">web</span></div></div>
+      <div class="box"><div class="box-title">Config</div>
+        <div class="chips"><span class="chip cfg">ConfigMap per app</span><span class="chip cfg">ServiceAccount → Google identity</span></div></div>
+    </div>
+    <div class="arrow-down"></div>
+    <div class="box ext"><div class="box-title">Outside the cluster, on purpose</div>
+      <div class="chips"><span class="chip ext">Cloud SQL</span><span class="chip ext">GCS image bucket</span><span class="chip ext">Secret Manager</span><span class="chip ext">Artifact Registry (images)</span></div></div>
+    <div class="legend"><span class="chip pod">Pod</span><span class="chip svc">Service</span><span class="chip cfg">Config</span><span class="chip ext">Managed by Google, not Kubernetes</span><span>Pod placement is illustrative: the scheduler decides.</span></div>
+  </div>
+  <p class="prose small muted">Step through the request hop by hop in <a href="../lessons/0001-following-a-request.html">lesson 1</a>.</p>
+</section>
+
+<section class="prose" id="from-node">
+  <h2>Map it to what you know.</h2>
+  <div class="card table-card">
+  <table>
+    <tr><th>You know</th><th>Kubernetes</th><th>At Acme</th></tr>
+    <tr><td>Docker image</td><td>Same image, run inside a <strong>Pod</strong></td><td>Built by GitHub Actions, pushed to Artifact Registry</td></tr>
+    <tr><td><code>pm2 start -i 2</code>, restart on crash</td><td><strong>Deployment</strong> with <code>replicas: 2</code></td><td><code>deployment-template.yaml</code> in each repo</td></tr>
+    <tr><td><code>pm2 reload</code> (zero-downtime)</td><td>RollingUpdate strategy</td><td><code>maxUnavailable: 0, maxSurge: 1</code></td></tr>
+    <tr><td>A health-check URL</td><td>Liveness and readiness <strong>probes</strong></td><td><code>GET /ping</code></td></tr>
+    <tr><td><code>localhost:3000</code> / a hostname</td><td><strong>Service</strong>: a stable DNS name in front of the pods</td><td><code>admin-app.default.svc.cluster.local</code></td></tr>
+    <tr><td>nginx reverse proxy</td><td><strong>Ingress</strong> (rules) + a controller that implements them</td><td>GKE Ingress → <code>edge-nginx</code></td></tr>
+    <tr><td><code>.env</code> file</td><td><strong>ConfigMap</strong> / <strong>Secret</strong></td><td>ConfigMap, with secrets in a cloud secret manager</td></tr>
+    <tr><td><code>docker compose up</code></td><td><code>kubectl apply -f</code> a folder of YAML</td><td>Cloud Deploy runs it for you</td></tr>
+  </table>
+  </div>
+</section>
+
+<section class="prose" id="components">
+  <h2>The main components.</h2>
+  <p class="sub">Two kinds: the machinery (you rarely touch it) and the objects (you write these).</p>
+
+  <h3>The machinery</h3>
+  <p>A <strong>cluster</strong> is a <strong>control plane</strong> plus <strong>nodes</strong> (<a href="https://kubernetes.io/docs/concepts/overview/components/">docs: components</a>). On GKE, Google runs the control plane for you.</p>
+  <div class="card table-card">
+  <table>
+    <tr><th>Piece</th><th>Lives on</th><th>Job</th></tr>
+    <tr><td>API server</td><td>control plane</td><td>The front door. <code>kubectl</code>, CI and controllers all talk to it.</td></tr>
+    <tr><td>etcd</td><td>control plane</td><td>The database of desired and actual state.</td></tr>
+    <tr><td>Scheduler</td><td>control plane</td><td>Picks which node a new pod runs on, based on the CPU/memory it requests.</td></tr>
+    <tr><td>Controller manager</td><td>control plane</td><td>The reconcile loops: "2 replicas wanted, 1 running → start one".</td></tr>
+    <tr><td>kubelet</td><td>every node</td><td>Starts the pod's containers and runs its probes. This is the part doing pm2's job.</td></tr>
+    <tr><td>kube-proxy</td><td>every node</td><td>Makes Service IPs route to the right pods.</td></tr>
+  </table>
+  </div>
+
+  <h3>The objects you write</h3>
+  <div class="card table-card">
+  <table>
+    <tr><th>Object</th><th>What it is</th></tr>
+    <tr><td><a href="https://kubernetes.io/docs/concepts/workloads/pods/">Pod</a></td><td>One or more containers that share an IP. The smallest thing Kubernetes runs. Disposable: they die and get replaced, with a new IP.</td></tr>
+    <tr><td><a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Deployment</a></td><td>"Keep N pods of this image running, and roll out new versions gradually." You almost never create pods directly.</td></tr>
+    <tr><td><a href="https://kubernetes.io/docs/concepts/services-networking/service/">Service</a></td><td>A stable name and IP that load-balances across pods with matching labels. <code>ClusterIP</code> = internal only; <code>NodePort</code>/<code>LoadBalancer</code> = reachable from outside the cluster.</td></tr>
+    <tr><td><a href="https://kubernetes.io/docs/concepts/services-networking/ingress/">Ingress</a></td><td>HTTP routing rules from the outside world ("this host and path → that Service"). On GKE, it becomes a Google load balancer.</td></tr>
+    <tr><td><a href="https://kubernetes.io/docs/concepts/configuration/configmap/">ConfigMap</a> / <a href="https://kubernetes.io/docs/concepts/configuration/secret/">Secret</a></td><td>Config fed into pods as env vars or files, so one image runs in test and prod.</td></tr>
+    <tr><td><a href="https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/">Probes</a></td><td>Readiness: "send me traffic yet?" Liveness: "am I stuck? restart me".</td></tr>
+    <tr><td>ServiceAccount</td><td>The pod's identity. With GKE Workload Identity it maps to a Google service account, so the pod can read a bucket or secret without a key file.</td></tr>
+    <tr><td><a href="https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/">HorizontalPodAutoscaler</a></td><td>Changes <code>replicas</code> based on CPU or other metrics. <em>Acme doesn't use one; replica counts are fixed per environment.</em></td></tr>
+    <tr><td>Namespace</td><td>A folder for objects. Acme puts everything in <code>default</code> and separates test and prod by cluster.</td></tr>
+  </table>
+  </div>
+</section>
+
+<section class="prose" id="good-at">
+  <h2>Good at, at a glance.</h2>
+  <div class="verdict">
+    <div class="yes"><h3>Reach for it when</h3><ul>
+      <li>many services share one platform</li>
+      <li>you need zero-downtime deploys</li>
+      <li>crashes must heal without a human</li>
+      <li>the same image runs in test and prod</li>
+    </ul></div>
+    <div class="no"><h3>Skip it when</h3><ul>
+      <li>you have one or two apps</li>
+      <li>it's a database or other heavy state</li>
+      <li>it's local development</li>
+      <li>it's a tiny job or a static site</li>
+    </ul></div>
+  </div>
+  <h2 style="margin-top:56px">What it's really good at.</h2>
+  <p class="sub">Paraphrasing the official list (<a href="https://kubernetes.io/docs/concepts/overview/#why-you-need-kubernetes-and-what-can-it-do">overview</a>), ordered by how much Acme leans on it.</p>
+  <div class="grid grid-2">
+    <div class="card"><h3>Self-healing</h3><p>Restarts crashed containers, kills ones that fail liveness, and withholds traffic until readiness passes. Nobody gets paged for a single OOM.</p></div>
+    <div class="card"><h3>Zero-downtime rollouts</h3><p>New pods start and pass readiness before old ones stop. A bad image never takes all traffic, and rollback is the same mechanism in reverse.</p></div>
+    <div class="card"><h3>Service discovery</h3><p>Every Service gets a DNS name. nginx reaches the admin app by name, never by IP, even as pods come and go.</p></div>
+    <div class="card"><h3>Same image, many environments</h3><p>Config lives outside the image, so the image tested on <code>staging-gke</code> is the exact one promoted to <code>prod-gke</code>.</p></div>
+    <div class="card"><h3>Bin packing</h3><p>Dozens of services share a few machines. The scheduler places pods by their declared CPU and memory requests.</p></div>
+    <div class="card"><h3>One way to run everything</h3><p>Java services, Next.js apps and nginx all deploy the same way: an image plus YAML. One platform to learn and monitor, not one per stack.</p></div>
+  </div>
+</section>
+
+<section class="prose" id="not-good-at">
+  <h2>What it's not good at, and what to use instead.</h2>
+  <p class="sub">The docs say it plainly: Kubernetes "is not a traditional, all-inclusive PaaS" (<a href="https://kubernetes.io/docs/concepts/overview/#what-kubernetes-is-not">overview</a>).</p>
+  <div class="card table-card">
+  <table>
+    <tr><th>Weak at</th><th>Why</th><th>Use instead</th></tr>
+    <tr><td>Small or few services</td><td>A cluster is a lot of moving parts and YAML to keep one or two apps alive</td><td><a href="https://cloud.google.com/run/docs/overview/what-is-cloud-run">Cloud Run</a> (give it an image, it scales to zero), Render/Fly.io, or one VM running docker compose</td></tr>
+    <tr><td>Databases and other state</td><td>Pods are disposable. Running Postgres well on Kubernetes means owning backups, failover and disk</td><td>Managed databases. Acme uses Cloud SQL, plus GCS buckets for images, outside the cluster</td></tr>
+    <tr><td>Building and shipping code</td><td>It "does not deploy source code and does not build your application"</td><td>CI: GitHub Actions builds the image, Google Cloud Deploy rolls it out</td></tr>
+    <tr><td>Local development</td><td>A local cluster (minikube, kind) is heavy and slow for a dev loop</td><td>docker compose for dependencies (orders-api starts RabbitMQ and a fake GCS this way), app run natively</td></tr>
+    <tr><td>Tiny event-driven jobs</td><td>A whole Deployment for a function that runs twice a day</td><td>Cloud Run jobs + Cloud Scheduler, Cloud Functions, Cloudflare Workers</td></tr>
+    <tr><td>Static sites</td><td>No server needed at all</td><td>CDN / object storage (Cloudflare Pages, GCS + CDN)</td></tr>
+    <tr><td>Running the cluster itself</td><td>Upgrades, node pools, networking: a job in itself</td><td>A managed control plane (GKE, which Acme uses), or GKE Autopilot, which manages the nodes too</td></tr>
+  </table>
+  </div>
+  <div class="callout warn">
+    <span class="label">Rule of thumb</span>
+    Kubernetes pays off when you have many services and a team to share the platform. A company with dozens of services usually gets its money back. A side project with one API usually doesn't: Cloud Run gives you most of the benefits with almost no YAML.
+  </div>
+</section>
+
+<section class="prose" id="videos">
+  <h2>Watch, in this order.</h2>
+  <p class="sub">Short first. Each one builds on the one before.</p>
+  <div class="card">
+    <a class="video" href="https://www.youtube.com/watch?v=Gjnup-PuquQ"><span class="len">2 min</span><strong>Docker in 100 Seconds</strong><span>Fireship · image vs container, if that's fuzzy</span></a>
+    <a class="video" href="https://www.youtube.com/watch?v=PziYflu8cB8"><span class="len">2 min</span><strong>Kubernetes Explained in 100 Seconds</strong><span>Fireship · the vocabulary in one breath</span></a>
+    <a class="video" href="https://www.youtube.com/watch?v=4ht22ReBjno"><span class="len">8 min</span><strong>The Illustrated Children's Guide to Kubernetes</strong><span>Deis / CNCF · one memorable picture per object</span></a>
+    <a class="video" href="https://www.youtube.com/watch?v=TlHvYWVUZyc"><span class="len">6 min</span><strong>Kubernetes Explained in 6 Minutes</strong><span>ByteByteGo · animated architecture: control plane and nodes</span></a>
+    <a class="video" href="https://www.youtube.com/watch?v=VnvRFRk_51k"><span class="len">14 min</span><strong>What is Kubernetes</strong><span>TechWorld with Nana · why orchestration exists</span></a>
+    <a class="video" href="https://www.youtube.com/watch?v=80Ew_fsV4rM"><span class="len">23 min</span><strong>Kubernetes Ingress Tutorial for Beginners</strong><span>TechWorld with Nana · the piece edge-nginx plays</span></a>
+    <a class="video" href="https://www.youtube.com/watch?v=s_o8dwzRlu4"><span class="len">72 min</span><strong>Kubernetes Crash Course for Absolute Beginners</strong><span>TechWorld with Nana · hands-on: Deployment, Service, ConfigMap, Secret</span></a>
+  </div>
+  <p class="small muted">Deeper later: <a href="https://www.youtube.com/watch?v=T4Z7visMM4E">Services explained</a>, <a href="https://www.youtube.com/watch?v=pg19Z8LL06w">Docker crash course</a>, <a href="https://www.youtube.com/watch?v=X48VuDVv0do">the 4-hour Kubernetes course</a>. Hands-on in the browser: <a href="https://kubernetes.io/docs/tutorials/kubernetes-basics/">Kubernetes Basics</a>.</p>
+</section>
+</main>
+
+<footer>Kubernetes for Node developers · Summary</footer>
+</body>
+</html>

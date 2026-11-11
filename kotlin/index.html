@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotlin for TypeScript developers</title>
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a href="../index.html">All courses</a>
+  <a class="brand" href="index.html">Kotlin for TypeScript developers</a>
+  <a class="current" href="index.html">Overview</a>
+  <a href="reference/kotlin-cheatsheet.html">Cheat sheet</a>
+  <a href="lessons/0001-reading-nullable-kotlin.html">Lesson 1</a>
+</div></nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">A five-minute-a-day course</p>
+  <h1>Kotlin, for reviewing<br>real-world code.</h1>
+  <p class="lede">Built around the kind of code you'll actually review, explained in TypeScript terms, one small idea at a time.</p>
+</header>
+
+<section>
+  <h2>The goal.</h2>
+  <p class="sub">Read a Kotlin PR without slowing down to guess.</p>
+  <div class="grid grid-3">
+    <div class="card">
+      <span class="pill blue">Mission</span>
+      <h3>Review with confidence</h3>
+      <p>For any line using <code>?.</code>, <code>?:</code>, <code>!!</code>, <code>let</code>, <code>apply</code> or <code>when</code>, say what it does and what happens on null. Then leave the comment that catches misuse.</p>
+    </div>
+    <div class="card">
+      <span class="pill">Format</span>
+      <h3>Small and real</h3>
+      <p>Five-minute lessons, each ending in a quiz. Analogies come from TypeScript. Every example looks like code you'll meet in a real backend.</p>
+    </div>
+    <div class="card">
+      <span class="pill">Not now</span>
+      <h3>Out of scope</h3>
+      <p>Writing new Kotlin features, coroutines, DSL design and build tooling. They can wait until reading is easy.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Where Kotlin lives.</h2>
+  <p class="sub">On a typical JVM backend, it shows up in a handful of recognisable shapes.</p>
+  <div class="grid grid-2">
+    <div class="card">
+      <span class="pill green">Kotlin only</span>
+      <h3>Newer services</h3>
+      <p>Small services written in Kotlin from day one. This is where the most idiomatic Kotlin lives, so most lesson examples look like this.</p>
+    </div>
+    <div class="card">
+      <span class="pill orange">Mostly Java</span>
+      <h3>Large legacy codebases</h3>
+      <p>A few dozen Kotlin files among thousands of Java ones. It often reads like Java written in Kotlin, which makes it useful critique material.</p>
+    </div>
+    <div class="card">
+      <span class="pill orange">Mostly Java</span>
+      <h3>Shared event libraries</h3>
+      <p>Small Kotlin data classes for events and messages. Many have <code>return data!!</code> in <code>getData()</code>.</p>
+    </div>
+    <div class="card">
+      <span class="pill">Java only</span>
+      <h3>Everything else</h3>
+      <p>No Kotlin at all.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label">Review is the style guide</span>
+    Plenty of teams never lint Kotlin. Then whatever Kotlin style a team has only holds if reviewers notice when it slips. That's why this course aims at reviewing.
+  </div>
+</section>
+
+<section>
+  <h2>What you'll see most.</h2>
+  <p class="sub">Rough counts from a survey of a mid-sized Kotlin backend.</p>
+  <div class="card table-card">
+    <ul class="rank">
+      <li><span><code>it</code>, the implicit lambda parameter</span><span class="n">~460</span></li>
+      <li><span><code>?:</code>, Elvis, including <code>?: return</code> and <code>?: throw</code></span><span class="n">~46</span></li>
+      <li><span><code>!!</code>, mostly in tests and event classes</span><span class="n">~32</span></li>
+      <li><span><code>with(x) { … }</code>, mostly in data ingestion code</span><span class="n">26</span></li>
+      <li><span><code>takeIf { … }</code></span><span class="n">17</span></li>
+      <li><span><code>?.let { … }</code></span><span class="n">13</span></li>
+      <li><span><code>when</code>, almost always as an expression</span><span class="n">~10</span></li>
+      <li><span><code>also</code>, <code>apply</code>, <code>run</code></span><span class="n">~20 combined</span></li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Covered so far.</h2>
+  <p class="sub">Each card opens the matching section of the cheat sheet.</p>
+  <div class="grid grid-3">
+    <a class="card" href="reference/kotlin-cheatsheet.html#null-safety">
+      <div class="num">01</div>
+      <h3>Null safety</h3>
+      <p><code>?.</code> and <code>?:</code> work like TS. <code>!!</code> crashes at runtime, which TS's <code>!</code> never does.</p>
+      <span class="pill blue">Lesson 1</span>
+    </a>
+    <a class="card" href="reference/kotlin-cheatsheet.html#arrows">
+      <div class="num">02</div>
+      <h3>The two arrows</h3>
+      <p>In <code>{ x -> … }</code>, the arrow separates parameters from the body. In <code>when</code>, it means "this case gives this result".</p>
+      <span class="pill">Explained in chat</span>
+    </a>
+    <a class="card" href="reference/kotlin-cheatsheet.html#let">
+      <div class="num">03</div>
+      <h3><code>?.let</code> and <code>it</code></h3>
+      <p>"If it's there, transform it." Otherwise the whole expression is <code>null</code>.</p>
+      <span class="pill">Explained in chat</span>
+    </a>
+    <a class="card" href="reference/kotlin-cheatsheet.html#when">
+      <div class="num">04</div>
+      <h3><code>when</code> as an expression</h3>
+      <p>A switch that returns a value. It must cover every enum entry, and <code>null</code> too. Leaving out <code>else</code> is deliberate.</p>
+      <span class="pill">Explained in chat</span>
+    </a>
+    <a class="card" href="reference/kotlin-cheatsheet.html#scope-functions">
+      <div class="num">05</div>
+      <h3>Scope functions</h3>
+      <p><code>let</code>, <code>also</code>, <code>apply</code>, <code>run</code> and <code>with</code> differ in two ways: whether the object is <code>it</code> or <code>this</code>, and what comes back.</p>
+      <span class="pill">Explained in chat</span>
+    </a>
+    <a class="card" href="reference/kotlin-cheatsheet.html#this">
+      <div class="num">06</div>
+      <h3><code>this</code> in lambdas</h3>
+      <p>Ordinary lambdas behave like arrow functions. <code>apply</code>, <code>run</code> and <code>with</code> bind <code>this</code> to the object, like <code>fn.call(obj)</code>.</p>
+      <span class="pill">Explained in chat</span>
+    </a>
+  </div>
+  <p class="small muted" style="margin-top:16px">"Explained in chat" means you've seen it once. The upcoming lessons bring each idea back as a quiz so it sticks.</p>
+</section>
+
+<section>
+  <h2>Lessons.</h2>
+  <p class="sub">Five minutes each. Do them a day or two apart.</p>
+  <div class="grid grid-2">
+    <a class="card" href="lessons/0001-reading-nullable-kotlin.html">
+      <div class="num">Lesson 1 · ready</div>
+      <h3>Reading nullable Kotlin</h3>
+      <p><code>?.</code>, <code>?:</code>, <code>!!</code> and the TS <code>!</code> trap. Four questions on realistic code.</p>
+    </a>
+    <div class="card">
+      <div class="num" style="color:var(--text-2)">Coming up</div>
+      <h3>The plan</h3>
+      <p>2 · <code>it</code>, lambdas and <code>?.let</code><br>3 · <code>let</code> vs <code>also</code><br>4 · Receivers: <code>apply</code>, <code>run</code>, <code>with</code><br>5 · <code>when</code> and smart casts<br>6 · Review drill on PR snippets</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Go deeper.</h2>
+  <p class="sub">The sources these lessons are built on.</p>
+  <div class="grid grid-3">
+    <a class="card" href="https://kotlinlang.org/docs/scope-functions.html#function-selection">
+      <span class="pill blue">Primary source</span>
+      <h3>Scope functions docs</h3>
+      <p>The official selection table. Read this one first.</p>
+    </a>
+    <a class="card" href="https://kotlinlang.org/docs/kotlin-tour-intermediate-scope-functions.html">
+      <span class="pill">Practice</span>
+      <h3>Kotlin tour exercises</h3>
+      <p>Short exercises you can run in the browser, covering scope functions, receivers and null safety.</p>
+    </a>
+    <a class="card" href="https://surveys.jetbrains.com/s3/kotlin-slack-sign-up">
+      <span class="pill green">Community</span>
+      <h3>Kotlin Slack</h3>
+      <p>The official workspace. Ask "which scope function here?" in <code>#getting-started</code>.</p>
+    </a>
+  </div>
+  <div class="callout good">
+    <span class="label">Your teacher is in the terminal</span>
+    Ask Claude about anything that's unclear. Say "next lesson" when you're ready for lesson 2.
+  </div>
+</section>
+</main>
+
+<footer>Kotlin for TypeScript developers · started 9 October 2026</footer>
+</body>
+</html>

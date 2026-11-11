@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotlin cheat sheet: nulls, lambdas, scope functions, when</title>
+<link rel="stylesheet" href="../../assets/course.css">
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+  <a class="brand" href="../index.html">Kotlin for TypeScript developers</a>
+  <a href="../index.html">Overview</a>
+  <a class="current" href="kotlin-cheatsheet.html">Cheat sheet</a>
+  <a href="../lessons/0001-reading-nullable-kotlin.html">Lesson 1</a>
+</div></nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">Reference</p>
+  <h1>The Kotlin you'll meet in review.</h1>
+  <p class="lede">Every concept we've covered so far, on one page. TypeScript on the left, Kotlin on the right, and a realistic example underneath.</p>
+</header>
+
+<!-- 1. Null safety -->
+<section id="null-safety" class="prose">
+  <p class="eyebrow">01</p>
+  <h2>Null safety</h2>
+  <p class="sub">Three operators. Two of them behave just like TypeScript; the third is a trap.</p>
+
+  <div class="card table-card">
+  <table>
+    <tr><th>TypeScript</th><th>Kotlin</th><th>What happens on null</th></tr>
+    <tr><td><code>string | null</code></td><td><code>String?</code></td><td>Plain <code>String</code> can never be null. The compiler enforces it.</td></tr>
+    <tr><td><code>a?.b</code></td><td><code>a?.b</code></td><td>Returns <code>null</code> instead of crashing. Same as TS.</td></tr>
+    <tr><td><code>a ?? b</code></td><td><code>a ?: b</code></td><td>"Elvis". Uses <code>b</code> only when <code>a</code> is null.</td></tr>
+    <tr><td><code>a!</code></td><td><code>a!!</code></td><td><strong>Kotlin throws a NullPointerException.</strong> TS's <code>!</code> does nothing at runtime.</td></tr>
+  </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="label">The trap for TS developers</span>
+    In TypeScript, <code>x!</code> is a promise to the compiler that gets erased from the output (<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#non-null-assertion-operator-postfix-">TS handbook</a>). In Kotlin, <code>x!!</code> is a runtime check that crashes with an NPE when <code>x</code> is null (<a href="https://kotlinlang.org/docs/null-safety.html#not-null-assertion-operator">Kotlin docs</a>). In review, every <code>!!</code> deserves the question "what guarantees this isn't null?"
+  </div>
+
+  <h3>Kotlin can do something TS can't</h3>
+  <p><code>return</code> and <code>throw</code> are expressions in Kotlin, so they can sit on the right side of <code>?:</code> (<a href="https://kotlinlang.org/docs/null-safety.html#elvis-operator">docs</a>). This is the idiomatic guard clause. It also leaves you with a non-null variable.</p>
+  <pre><code>val title = Titles.normalize(request.title) <mark>?: throw</mark> IllegalArgumentException("title must not be blank")
+<span class="c">// title is String here, not String?</span></code></pre>
+  <pre><code>val customer = customerRepository.findCustomer(order.customerId) <mark>?: return null</mark></code></pre>
+</section>
+
+<!-- 2. Lambdas and the arrows -->
+<section id="arrows" class="prose">
+  <p class="eyebrow">02</p>
+  <h2>Lambdas and the two arrows</h2>
+  <p class="sub"><code>-></code> means two different things depending on where it appears.</p>
+
+  <h3>Inside <code>{ }</code>, the arrow separates parameters from the body</h3>
+  <div class="compare">
+    <div><div class="tag">TypeScript</div><pre><code>items.map((x) => x * 2)
+<span class="c">// no TS equivalent of `it`</span></code></pre></div>
+    <div><div class="tag">Kotlin</div><pre><code>items.map { x -> x * 2 }
+items.map { it * 2 }</code></pre></div>
+  </div>
+  <p>Kotlin lambdas live entirely inside the braces. If a lambda has exactly one parameter, you can skip naming it, and it's called <code>it</code> (<a href="https://kotlinlang.org/docs/lambdas.html#it-implicit-name-of-a-single-parameter">docs</a>). When the lambda is the last argument, it moves outside the parentheses, which is why you see <code>map { … }</code> instead of <code>map({ … })</code> (<a href="https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas">docs</a>).</p>
+
+  <h3>Inside <code>when</code>, the arrow means "this case gives this result"</h3>
+  <div class="compare">
+    <div><div class="tag">TypeScript</div><pre><code>switch (status) {
+  case "PENDING": return a;
+  case "SHIPPED": return b;
+}</code></pre></div>
+    <div><div class="tag">Kotlin</div><pre><code>when (status) {
+  PENDING -> a
+  SHIPPED -> b
+}</code></pre></div>
+  </div>
+</section>
+
+<!-- 3. ?.let -->
+<section id="let" class="prose">
+  <p class="eyebrow">03</p>
+  <h2><code>?.let</code>: do this only if it's there</h2>
+  <p class="sub">The most common way Kotlin code transforms a value that might be null.</p>
+  <pre><code>shipment<mark>?.let</mark> { ShipmentDTO(<mark>it</mark>.carrier, <mark>it</mark>.shippedAt, <mark>it</mark>.trackingCode, <mark>it</mark>.note) }</code></pre>
+  <p>Read it in two halves. <code>?.</code> says "if <code>shipment</code> is null, stop here and give back <code>null</code>". <code>let { … }</code> says "otherwise, run this lambda with <code>shipment</code> as <code>it</code>, and give back whatever the lambda returns". The TS equivalent:</p>
+  <pre><code>shipment == null ? null : toDto(shipment)</code></pre>
+  <p>Another example of the same pattern:</p>
+  <pre><code>store?.let { Currency.fromCodeOrNull(it.settings.currencyCode) }
+<span class="c">// Currency? — null if store is null OR the currency code is unknown</span></code></pre>
+</section>
+
+<!-- 4. when -->
+<section id="when" class="prose">
+  <p class="eyebrow">04</p>
+  <h2><code>when</code> as an expression</h2>
+  <p class="sub">A switch that returns a value, and refuses to compile if you forget a case.</p>
+  <pre><code>private fun reminderDelayOf(status: OrderStatus) = <mark>when</mark> (status) {
+    OrderStatus.PENDING -> properties.pendingReminderAfter
+    OrderStatus.SHIPPED -> properties.deliveryReminderAfter
+}</code></pre>
+  <p>When <code>when</code> produces a value, the compiler requires every possible value of the subject to be covered (<a href="https://kotlinlang.org/docs/control-flow.html#when-expressions-and-statements">docs</a>). For an enum, that means every entry. For a nullable enum, it also means <code>null</code>. Commas group several cases: <code>Region.EU, Region.UK, null -> false</code>.</p>
+  <p>TypeScript gets the same safety only if you add a <code>never</code> check in the <code>default</code> branch. In Kotlin, it comes free, as long as nobody writes <code>else</code>.</p>
+  <div class="callout">
+    <span class="label">Review lens</span>
+    No <code>else</code> on an enum <code>when</code> is deliberate. Adding <code>Region.APAC</code> later breaks the build, which forces whoever adds it to decide what Asia-Pacific shows. An <code>else -> false</code> would silently say "no". If a PR adds an <code>else</code> to an enum <code>when</code>, ask why.
+  </div>
+</section>
+
+<!-- 5. Scope functions -->
+<section id="scope-functions" class="prose">
+  <p class="eyebrow">05</p>
+  <h2>Scope functions</h2>
+  <p class="sub">Five functions that run a block of code against one object. They differ in only two ways.</p>
+  <div class="card table-card">
+  <table>
+    <tr><th>Function</th><th>The object is called</th><th>Returns</th><th>Reach for it to…</th></tr>
+    <tr><td><code>let</code></td><td><code>it</code></td><td>lambda result</td><td>transform a value, usually after <code>?.</code></td></tr>
+    <tr><td><code>also</code></td><td><code>it</code></td><td>the object</td><td>add a side effect like logging or storing (TS: a "tap")</td></tr>
+    <tr><td><code>apply</code></td><td><code>this</code></td><td>the object</td><td>configure an object you just created</td></tr>
+    <tr><td><code>run</code></td><td><code>this</code></td><td>lambda result</td><td>configure, then compute a result</td></tr>
+    <tr><td><code>with(x)</code></td><td><code>this</code></td><td>lambda result</td><td>make several calls on <code>x</code></td></tr>
+  </table>
+  </div>
+  <p class="small muted">Source: the selection table in the <a href="https://kotlinlang.org/docs/scope-functions.html#function-selection">official scope functions docs</a>.</p>
+
+  <h4>apply · configure and return the object</h4>
+  <pre><code>fun storefrontETags() = FilterRegistrationBean(ShallowEtagHeaderFilter()).<mark>apply</mark> {
+    addUrlPatterns("/shop/", "/shop/index.html", "/shop/app.js", "/shop/app.css")
+}</code></pre>
+
+  <h4>also · keep the value, do something on the side</h4>
+  <pre><code>val batch = pending ?: orderRepository.newBatch(type).<mark>also</mark> { pending = it }</code></pre>
+
+  <h4>with · many calls on one object</h4>
+  <pre><code>private fun ReceiptDeliveryFailedEvent.isBounceWeRetry() = <mark>with(data)</mark> {
+    category == "Bounce" && RETRIED_CHANNELS.any { channel.equals(it, ignoreCase = true) }
+}</code></pre>
+  <p class="small muted">Inside the block, <code>category</code> means <code>data.category</code>.</p>
+</section>
+
+<!-- 6. this -->
+<section id="this" class="prose">
+  <p class="eyebrow">06</p>
+  <h2>What <code>this</code> means inside a lambda</h2>
+  <p class="sub">If you know JavaScript's <code>this</code> rules, you already know this.</p>
+  <div class="card table-card">
+  <table>
+    <tr><th>Kotlin</th><th>Behaves like (JS/TS)</th><th><code>this</code> is…</th></tr>
+    <tr><td>ordinary lambda: <code>let</code>, <code>also</code>, <code>map</code></td><td>an arrow function</td><td>whatever it was outside, usually the enclosing class</td></tr>
+    <tr><td>lambda with receiver: <code>apply</code>, <code>run</code>, <code>with</code></td><td><code>fn.call(obj)</code>, or a function with a <code>this: T</code> parameter</td><td>the object</td></tr>
+  </table>
+  </div>
+  <p>The difference shows up in the types. <code>(T) -> R</code> takes the object as a parameter, and you get <code>it</code>. <code>T.() -> R</code> runs as if it were a method on <code>T</code>, so you get <code>this</code> (<a href="https://kotlinlang.org/docs/lambdas.html#function-literals-with-receiver">docs</a>). In TS terms, <code>T.() -> R</code> is <code>(this: T) => R</code>.</p>
+  <p>Inside a receiver lambda, bare names resolve to the object first. If you need the outer class, label it: <code>this@OrderController</code>. That's also why <code>let</code> often reads better in review: with <code>it</code>, you always know where a name comes from.</p>
+</section>
+
+<section class="prose">
+  <div class="callout good">
+    <span class="label">Stuck on something?</span>
+    Ask Claude in your terminal session. It's the teacher for this course and can walk through any snippet you paste.
+  </div>
+</section>
+</main>
+
+<footer>Kotlin for TypeScript developers · reference · last updated 9 October 2026 · primary source: <a href="https://kotlinlang.org/docs/scope-functions.html">kotlinlang.org</a></footer>
+</body>
+</html>
